@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { Card, CardContent, CardTitle, CardDescription } from "./ui/card";
 import { Avatar, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
 import { CardBody, CardContainer, CardItem } from "./ui/3d-card";

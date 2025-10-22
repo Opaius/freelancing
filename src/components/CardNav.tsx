@@ -132,7 +132,7 @@ const CardNav: React.FC<CardNavProps> = ({
       tl?.kill();
       tlRef.current = null;
     };
-  }, [ease, items]);
+  }, [ease, items, createTimeline]);
 
   useEffect(() => {
     if (!isExpanded) setHoveredIndex(null);

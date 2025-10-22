@@ -1,5 +1,4 @@
 "use client";
-import LightRays from "@/components/LightRays";
 import Particles from "@/components/Particles";
 import { ProfileCard } from "@/components/ProfileCard";
 import SplitText from "@/components/SplitText";
