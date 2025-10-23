@@ -65,13 +65,14 @@ export default function PersonalLayout({
   ] as CardNavItem[];
   return (
     <>
-      <CardNav
-        logo=""
-        logoAlt="Company Logo"
-        items={items}
-        ease="power3.out"
-        className="mb-10"
-      />
+      <div className="h-[100px]">
+        <CardNav
+          logo=""
+          logoAlt="Company Logo"
+          items={items}
+          ease="power3.out"
+        />
+      </div>
 
       {children}
     </>

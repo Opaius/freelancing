@@ -17,10 +17,26 @@ interface ParticlesProps {
   className?: string;
 }
 
-const defaultColors: string[] = ["#ffffff", "#ffffff", "#ffffff"];
+const defaultColors: string[] = ["var(--color-background)", "var(--color-primary-500)", "var(--color-accent-500)"];
 
-const hexToRgb = (hex: string): [number, number, number] => {
-  hex = hex.replace(/^#/, "");
+const hexToRgb = (color: string): [number, number, number] => {
+  // Handle CSS variables
+  if (color.startsWith('var(--')) {
+    const tempDiv = document.createElement('div');
+    tempDiv.style.color = color;
+    document.body.appendChild(tempDiv);
+    const computedColor = getComputedStyle(tempDiv).color;
+    document.body.removeChild(tempDiv);
+
+    // Parse computed color (rgb(r, g, b) format)
+    const rgbMatch = computedColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (rgbMatch) {
+      return [parseInt(rgbMatch[1]) / 255, parseInt(rgbMatch[2]) / 255, parseInt(rgbMatch[3]) / 255];
+    }
+  }
+
+  // Handle hex colors (existing logic)
+  let hex = color.replace(/^#/, "");
   if (hex.length === 3) {
     hex = hex
       .split("")
@@ -119,7 +135,7 @@ const Particles: React.FC<ParticlesProps> = ({
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return; 
+    if (!container) return;
     gsap.fromTo(container, { opacity: 0 }, { opacity: 1, duration: 1 });
   }, []);
 

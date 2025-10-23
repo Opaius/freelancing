@@ -54,11 +54,7 @@ const CardNav: React.FC<CardNavProps> = ({
   // Ref to hold the element that acts as the moving hover background
   const hoverBgRef = useRef<HTMLSpanElement | null>(null);
 
-  /**
-   * Calculates the full expanded height of the navigation.
-   * This is crucial for the GSAP timeline's `height` animation.
-   */
-  const calculateHeight = () => {
+  const calculateHeight = useCallback(() => {
     const navEl = navRef.current;
     if (!navEl) return 260;
 
@@ -66,32 +62,35 @@ const CardNav: React.FC<CardNavProps> = ({
     if (isMobile) {
       const contentEl = navEl.querySelector(".card-nav-content") as HTMLElement;
       if (contentEl) {
-        // Temporarily make the content visible and auto-sized to get its natural height
-        const wasVisible = contentEl.style.visibility;
-        const wasPointerEvents = contentEl.style.pointerEvents;
-        const wasPosition = contentEl.style.position;
-        const wasHeight = contentEl.style.height;
+        // Use getComputedStyle for more reliable measurements
+        const computedStyle = window.getComputedStyle(contentEl);
+        const paddingTop = parseFloat(computedStyle.paddingTop) || 0;
+        const paddingBottom = parseFloat(computedStyle.paddingBottom) || 0;
 
-        contentEl.style.visibility = "visible";
-        contentEl.style.pointerEvents = "auto";
-        contentEl.style.position = "static";
-        contentEl.style.height = "auto";
+        // Create a temporary clone to measure without affecting layout
+        const clone = contentEl.cloneNode(true) as HTMLElement;
+        clone.style.cssText = `
+          position: absolute;
+          visibility: hidden;
+          pointer-events: none;
+          height: auto;
+          width: ${contentEl.offsetWidth}px;
+          top: -9999px;
+          left: -9999px;
+        `;
+
+        navEl.appendChild(clone);
+        const contentHeight = clone.scrollHeight;
+        navEl.removeChild(clone);
 
         const topBar = 60;
-        const padding = 16;
-        const contentHeight = contentEl.scrollHeight;
-
-        // Restore original styles
-        contentEl.style.visibility = wasVisible;
-        contentEl.style.pointerEvents = wasPointerEvents;
-        contentEl.style.position = wasPosition;
-        contentEl.style.height = wasHeight;
+        const padding = paddingTop + paddingBottom;
 
         return topBar + contentHeight + padding;
       }
     }
     return 260; // Default desktop height
-  };
+  }, []);
 
   /**
    * Creates the main menu open/close GSAP timeline.
@@ -121,7 +120,7 @@ const CardNav: React.FC<CardNavProps> = ({
     );
 
     return tl;
-  }, [ease]);
+  }, [ease, calculateHeight]);
 
   // --- Main Timeline Effects ---
   useLayoutEffect(() => {
@@ -141,33 +140,36 @@ const CardNav: React.FC<CardNavProps> = ({
   // --- Resize Handler (Recalculate Height) ---
   useLayoutEffect(() => {
     const handleResize = () => {
-      if (!tlRef.current) return;
+      if (!tlRef.current || !isExpanded) return;
 
-      if (isExpanded) {
-        // If expanded, recalculate and immediately set the new height
-        const newHeight = calculateHeight();
-        gsap.set(navRef.current, { height: newHeight });
+      // Instead of immediately setting height, smoothly animate to new height
+      const newHeight = calculateHeight();
 
-        // Kill and recreate timeline to update the target height, then set to end state
-        tlRef.current.kill();
-        const newTl = createTimeline();
-        if (newTl) {
-          newTl.progress(1); // Set to fully expanded state
-          tlRef.current = newTl;
-        }
-      } else {
-        // If collapsed, just kill and recreate to get the correct height for next expansion
-        tlRef.current.kill();
-        const newTl = createTimeline();
-        if (newTl) {
-          tlRef.current = newTl;
-        }
+      // Animate to new height instead of jumping
+      gsap.to(navRef.current, {
+        height: newHeight,
+        duration: 0.2,
+        ease: "power2.out",
+      });
+
+      // Update timeline target without recreating it entirely
+      const tl = tlRef.current;
+      if (tl) {
+        tl.to(
+          navRef.current,
+          {
+            height: newHeight,
+            duration: 0.4,
+            ease: ease,
+          },
+          0
+        ); // Update the height animation at position 0
       }
     };
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [isExpanded, createTimeline]);
+  }, [isExpanded, calculateHeight, ease]);
 
   // --- Hover Effect Logic (New GSAP Implementation) ---
   useLayoutEffect(() => {
@@ -195,8 +197,8 @@ const CardNav: React.FC<CardNavProps> = ({
 
       // Animate the background to match the card's position and size
       gsap.to(bgEl, {
-        left: x,
-        top: y,
+        x: x,
+        y: y,
         width: width + 10,
         height: height + 10,
         opacity: 1,
@@ -208,9 +210,8 @@ const CardNav: React.FC<CardNavProps> = ({
       // We keep its position, but make it invisible.
       gsap.to(bgEl, {
         opacity: 0,
-        left: 0,
-        top: 0,
         duration: 0.2,
+        ease: "power2.out",
       });
     }
   }, [hoveredIndex]);
@@ -242,7 +243,11 @@ const CardNav: React.FC<CardNavProps> = ({
 
   return (
     <div
-      className={`card-nav-container sticky w-full flex justify-center z-99 top-[1.2em] md:top-[2em] ${className}`}
+      className={`card-nav-container absolute w-full flex justify-center z-99 top-[1.2em] md:top-[2em] ${className}`}
+      style={{
+        transform: "translateZ(0)", // Force hardware acceleration
+        backfaceVisibility: "hidden",
+      }}
       onMouseLeave={() => setHoveredIndex(null)}
     >
       <nav
@@ -250,6 +255,10 @@ const CardNav: React.FC<CardNavProps> = ({
         className={`card-nav ${
           isExpanded ? "open" : ""
         } block h-[60px] w-[90%] max-w-[800px] p-0 rounded-xl shadow-md relative overflow-hidden will-change-[height] bg-card`}
+        style={{
+          transform: "translateZ(0)", // Force hardware acceleration
+          backfaceVisibility: "hidden",
+        }}
       >
         {/* Top Bar (Unchanged) */}
         <div className="card-nav-top absolute inset-x-0 top-0 h-[60px] flex items-center justify-between p-2 pl-[1.1rem] z-2">
@@ -307,6 +316,8 @@ const CardNav: React.FC<CardNavProps> = ({
               left: 0,
               top: 0,
               transformOrigin: "top left",
+              willChange: "transform, opacity, width, height",
+              backfaceVisibility: "hidden",
             }}
           />
 
